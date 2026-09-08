@@ -59,6 +59,7 @@ return function(Import)
 				ToggleKey = "RightShift",
 				Scale = {Desktop = 0.9, Mobile = 0.62},
 				MobileLauncher = {X = 0.96, Y = 0.86},
+				MobileLauncherPositions = {},
 				UIBlur = false,
 				HidePrivateInfo = true,
 			},

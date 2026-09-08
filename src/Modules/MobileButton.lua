@@ -41,6 +41,24 @@ end
 			}, "misc.mobile_button")
 			section:Label({ Text = "Drag to move, tap to toggle the hub. Shown on PC and mobile; the badge reflects whether the hub is open." })
 
+			-- Position is stored per config profile: switching profiles moves
+			-- the button to where it was for that profile (or the standard spot
+			-- for a brand new one).
+			state.LastConfig = tostring(ctx.Config.Account.SelectedConfig or "main")
+			local worker = task.spawn(function()
+				while state.Alive and ctx.Runtime.Alive do
+					local selected = tostring(ctx.Config.Account.SelectedConfig or "main")
+					if selected ~= state.LastConfig then
+						state.LastConfig = selected
+						if state.Wanted ~= false then
+							ctx.UIManager:UnmountMobileLauncher()
+							ctx.UIManager:MountMobileLauncher(guiParent(), ctx.Config)
+						end
+					end
+					task.wait(0.5)
+				end
+			end)
+			ctx.RegisterCleanup(worker)
 			ctx.RegisterCleanup(function()
 				ctx.UIManager:UnmountMobileLauncher()
 				state.Alive = false

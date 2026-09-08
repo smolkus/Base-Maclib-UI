@@ -184,9 +184,15 @@ return function(Import)
 
 	function UIManager:MountMobileLauncher(parent, config)
 		if self.LauncherGui or not parent then return false end
-		local launcherSize = math.clamp(math.floor(viewportSize().Y * 0.055), 46, 62)
+		local viewport = viewportSize()
+		local launcherSize = math.clamp(math.floor(math.max(viewport.Y * 0.06, viewport.X * 0.034)), 48, 112)
 		local ui = type(self.Account.UI) == "table" and self.Account.UI or {}
-		local stored = type(ui.MobileLauncher) == "table" and ui.MobileLauncher or {X = 0.96, Y = 0.86}
+		-- Position is per config profile: a brand new config starts at the
+		-- standard spot, a saved one restores where the user last left it.
+		local positions = type(ui.MobileLauncherPositions) == "table" and ui.MobileLauncherPositions or {}
+		local configName = tostring(self.Account and self.Account.SelectedConfig or "main")
+		local stored = (type(positions[configName]) == "table" and positions[configName])
+			or {X = 0.96, Y = 0.86}
 		local created
 		local ok = elevated(function()
 			local screen = Instance.new("ScreenGui")
@@ -247,8 +253,8 @@ return function(Import)
 			local brand = Instance.new("TextLabel")
 			brand.Name = "Brand"
 			brand.BackgroundTransparency = 1
-			brand.Position = UDim2.fromOffset(0, 6)
-			brand.Size = UDim2.new(1, 0, 0, 23)
+			brand.Position = UDim2.fromOffset(0, math.floor(launcherSize * 0.12))
+			brand.Size = UDim2.new(1, 0, 0, math.floor(launcherSize * 0.44))
 			brand.Font = Enum.Font.GothamBold
 			brand.Text = self.LauncherBrand or "HUB"
 			brand.TextColor3 = Color3.fromRGB(242, 244, 248)
@@ -259,20 +265,20 @@ return function(Import)
 			local status = Instance.new("TextLabel")
 			status.Name = "Status"
 			status.BackgroundTransparency = 1
-			status.Position = UDim2.fromOffset(0, 28)
-			status.Size = UDim2.new(1, 0, 0, 12)
+			status.Position = UDim2.fromOffset(0, math.floor(launcherSize * 0.54))
+			status.Size = UDim2.new(1, 0, 0, math.floor(launcherSize * 0.22))
 			status.Font = Enum.Font.GothamMedium
 			status.Text = "HIDE"
 			status.TextColor3 = Color3.fromRGB(158, 163, 174)
-			status.TextSize = 7
+			status.TextSize = math.max(7, math.floor(launcherSize * 0.13))
 			status.ZIndex = 3
 			status.Parent = button
 
 			local accent = Instance.new("Frame")
 			accent.Name = "Accent"
 			accent.AnchorPoint = Vector2.new(0.5, 1)
-			accent.Position = UDim2.new(0.5, 0, 1, -5)
-			accent.Size = UDim2.fromOffset(19, 2)
+			accent.Position = UDim2.new(0.5, 0, 1, -math.max(4, math.floor(launcherSize * 0.1)))
+			accent.Size = UDim2.fromOffset(math.floor(launcherSize * 0.37), 2)
 			accent.BackgroundColor3 = Color3.fromRGB(88, 201, 255)
 			accent.BorderSizePixel = 0
 			accent.ZIndex = 3
@@ -358,7 +364,8 @@ return function(Import)
 				suppressClickUntil = os.clock() + 0.2
 				local position = self.LauncherPosition
 				local saveOk, saveError = config:UpdateAccount(function(account)
-					account.UI.MobileLauncher = {X = position.X, Y = position.Y}
+					account.UI.MobileLauncherPositions = account.UI.MobileLauncherPositions or {}
+					account.UI.MobileLauncherPositions[tostring(account.SelectedConfig or "main")] = {X = position.X, Y = position.Y}
 				end, true)
 				if not saveOk then Util.Warn("mobile launcher position save failed: " .. tostring(saveError)) end
 			end
