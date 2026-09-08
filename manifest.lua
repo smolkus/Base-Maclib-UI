@@ -1,0 +1,21 @@
+return {
+	Version = "1.0.0",
+	Entry = "Main",
+	Modules = {
+		Build = "src/Build.lua",
+		Util = "src/Core/Util.lua",
+		Janitor = "src/Core/Janitor.lua",
+		FileSystem = "src/Core/FileSystem.lua",
+		ControlRegistry = "src/Core/ControlRegistry.lua",
+		ConfigManager = "src/Core/ConfigManager.lua",
+		ModuleManager = "src/Core/ModuleManager.lua",
+		UIManager = "src/Core/UIManager.lua",
+		MacLibProvider = "src/Core/MacLibProvider.lua",
+		SessionManager = "src/Core/SessionManager.lua",
+		Performance = "src/Modules/Performance.lua",
+		Settings = "src/Modules/Settings.lua",
+		Misc = "src/Modules/Misc.lua",
+		MobileButton = "src/Modules/MobileButton.lua",
+		Main = "src/Main.lua",
+	},
+}
