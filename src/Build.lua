@@ -7,5 +7,6 @@ return function()
 		LoaderUrl = "https://jexvral.xyz/game/base/loader",
 		MacLibUrl = "https://raw.githubusercontent.com/Byorl/Maclib/7a99c23bde4eee7d19b054462b17985d06a74ae5/src/maclib.lua",
 		DataRoot = "BaseHubData",
+		LauncherText = "BH",
 	}
 end

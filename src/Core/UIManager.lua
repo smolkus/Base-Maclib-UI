@@ -65,11 +65,15 @@ return function(Import)
 		return UDim2.fromOffset(size.X, size.Y)
 	end
 
+	-- Defaults track the screen: half the viewport height in design pixels,
+	-- clamped so phones get a readable window and big monitors stay sane.
 	function UIManager.DefaultScale(device)
-		return DEFAULT_SCALE[device or UIManager.DeviceClass()] or DEFAULT_SCALE.Desktop
+		local size = BASE_SIZE[device or UIManager.DeviceClass()] or BASE_SIZE.Desktop
+		local viewport = viewportSize()
+		return math.clamp((viewport.Y * 0.5) / size.Y, 0.62, 1.2)
 	end
 
-	function UIManager.new(window, account)
+	function UIManager.new(window, account, build)
 		local device = UIManager.DeviceClass()
 		local stored = type(account.UI) == "table" and type(account.UI.Scale) == "table"
 			and tonumber(account.UI.Scale[device]) or nil
@@ -78,6 +82,7 @@ return function(Import)
 			Account = account,
 			Device = device,
 			BasePixels = BASE_SIZE[device],
+			LauncherBrand = type(build) == "table" and (build.LauncherText or "HUB") or "HUB",
 			RequestedScale = stored or UIManager.DefaultScale(device),
 			CurrentScale = 0,
 			TargetScale = 0,
@@ -178,7 +183,8 @@ return function(Import)
 	end
 
 	function UIManager:MountMobileLauncher(parent, config)
-		if not UserInputService.TouchEnabled or self.LauncherGui or not parent then return false end
+		if self.LauncherGui or not parent then return false end
+		local launcherSize = math.clamp(math.floor(viewportSize().Y * 0.055), 46, 62)
 		local ui = type(self.Account.UI) == "table" and self.Account.UI or {}
 		local stored = type(ui.MobileLauncher) == "table" and ui.MobileLauncher or {X = 0.96, Y = 0.86}
 		local created
@@ -195,7 +201,7 @@ return function(Import)
 			shadow.Name = "Shadow"
 			shadow.AnchorPoint = Vector2.new(0.5, 0.5)
 			shadow.Position = UDim2.fromScale(0.5, 0.54)
-			shadow.Size = UDim2.fromOffset(52, 52)
+			shadow.Size = UDim2.fromOffset(launcherSize + 4, launcherSize + 4)
 			shadow.BackgroundColor3 = Color3.fromRGB(0, 0, 0)
 			shadow.BackgroundTransparency = 0.48
 			shadow.BorderSizePixel = 0
@@ -204,7 +210,7 @@ return function(Import)
 			local button = Instance.new("TextButton")
 			button.Name = "Launcher"
 			button.AnchorPoint = Vector2.new(0.5, 0.5)
-			button.Size = UDim2.fromOffset(LAUNCHER_SIZE, LAUNCHER_SIZE)
+			button.Size = UDim2.fromOffset(launcherSize, launcherSize)
 			button.BackgroundColor3 = Color3.fromRGB(18, 19, 23)
 			button.BackgroundTransparency = 0.04
 			button.BorderSizePixel = 0
@@ -244,9 +250,9 @@ return function(Import)
 			brand.Position = UDim2.fromOffset(0, 6)
 			brand.Size = UDim2.new(1, 0, 0, 23)
 			brand.Font = Enum.Font.GothamBold
-			brand.Text = "AE"
+			brand.Text = self.LauncherBrand or "HUB"
 			brand.TextColor3 = Color3.fromRGB(242, 244, 248)
-			brand.TextSize = 17
+			brand.TextSize = math.floor(launcherSize * 0.34)
 			brand.ZIndex = 3
 			brand.Parent = button
 
@@ -397,6 +403,17 @@ return function(Import)
 			self.Window:SetScale(self.CurrentScale)
 		end
 		return self.RequestedScale, self.TargetScale
+	end
+
+	function UIManager:UnmountMobileLauncher()
+		if self.LauncherGui then
+			pcall(function() self.LauncherGui:Destroy() end)
+		end
+		self.Launcher = nil
+		self.LauncherGui = nil
+		self.LauncherStatus = nil
+		self.LauncherAccent = nil
+		self.LauncherPressScale = nil
 	end
 
 	function UIManager:Destroy()

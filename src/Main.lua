@@ -137,7 +137,7 @@ return function(Import)
 
 	local parent = guiParent()
 	destroyReserved(parent, "BaseHub_MacLib")
-	destroyReserved(parent, "BaseHub_MobileButton")
+	destroyReserved(parent, "BaseHub_MobileLauncher")
 	local beforeGui = captureChildren(parent)
 
 	local FileStore = FileSystem.new(Build.DataRoot)
@@ -154,17 +154,12 @@ return function(Import)
 	local MacLib = MacLibProvider.Load()
 	Runtime.MacLib = MacLib
 	local deviceClass = UIManager.DeviceClass()
-	local storedScale = type(Config.Account.UI.Scale) == "table" and Config.Account.UI.Scale[deviceClass] or nil
-	local scale = math.clamp(tonumber(storedScale) or 1, 0.35, 1.2)
 	local baseSize = UIManager.BaseSize(deviceClass)
 	local accountKey = Enum.KeyCode[tostring(Config.Account.UI.ToggleKey)] or Enum.KeyCode.RightShift
 	local Window = MacLib:Window({
 		Title = Build.Name,
 		Subtitle = "v" .. Build.Version,
-		Size = UDim2.new(
-			baseSize.X.Scale, baseSize.X.Offset * scale,
-			baseSize.Y.Scale, baseSize.Y.Offset * scale
-		),
+		Size = baseSize,
 		DragStyle = 1,
 		DisabledWindowControls = {},
 		ShowUserInfo = false,
@@ -172,7 +167,7 @@ return function(Import)
 		AcrylicBlur = Config.Account.UI.UIBlur == true,
 	})
 	Runtime.Window = Window
-	local ResponsiveUI = UIManager.new(Window, Config.Account)
+	local ResponsiveUI = UIManager.new(Window, Config.Account, Build)
 	Runtime.UIManager = ResponsiveUI
 
 	for _, child in ipairs(parent:GetChildren()) do
