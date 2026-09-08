@@ -73,6 +73,16 @@ module versions to migrate saved control state.
 
 ---
 
+## Code conventions (required)
+
+- **No Lua comments.** Never write `--` comments in `.lua`/`.luau` files —
+  shipped code stays comment-free. Explanations belong here in the markdown
+  docs, not in the code. This applies to every module, the loader, and any
+  PoC or test script.
+- Keep `src/Core/` stock across games; per-game knowledge only in
+  `src/Modules/` and `Build.lua`.
+- Bump `Version` in `manifest.lua` + `src/Build.lua` together per release.
+
 ## 3. Deploying to Hetzner (jexvral.xyz hosting)
 
 Hosting is a **GitHub proxy**: `jexvral.xyz/game/<alias>/<path>` serves
