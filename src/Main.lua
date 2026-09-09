@@ -9,6 +9,7 @@ return function(Import)
 	local UIManager = Import("UIManager")
 	local MacLibProvider = Import("MacLibProvider")
 	local SessionManager = Import("SessionManager")
+	local CloudSyncModule = Import("CloudSync")
 	local PerformanceModule = Import("Performance")
 	local SettingsModule = Import("Settings")
 	local MiscModule = Import("Misc")
@@ -205,6 +206,7 @@ return function(Import)
 
 	local Modules = ModuleManager.new(Context)
 	Runtime.Modules = Modules
+	Context.Cloud = CloudSyncModule
 	Modules:Register(PerformanceModule)
 	Modules:Register(SettingsModule)
 	Modules:Register(MiscModule)
@@ -232,6 +234,9 @@ return function(Import)
 	Registry.OnChanged = function()
 		Config:ScheduleAutoSave()
 	end
+	task.spawn(function()
+		Util.SafeCall("cloud sync", CloudSyncModule.Start, Context)
+	end)
 
 	if Config.Account.UI.HiddenOnLoad == true then
 		Window:SetState(false)

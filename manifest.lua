@@ -12,6 +12,7 @@ return {
 		UIManager = "src/Core/UIManager.lua",
 		MacLibProvider = "src/Core/MacLibProvider.lua",
 		SessionManager = "src/Core/SessionManager.lua",
+		CloudSync = "src/Core/CloudSync.lua",
 		Performance = "src/Modules/Performance.lua",
 		Settings = "src/Modules/Settings.lua",
 		Misc = "src/Modules/Misc.lua",
