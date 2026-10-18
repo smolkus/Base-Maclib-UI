@@ -86,7 +86,24 @@ return function(Import)
 		end
 	end
 
-	function ControlRegistry:_Register(flag, kind, control, defaultValue, apply, owner)
+	local function describe(settings)
+		if type(settings) ~= "table" then return {} end
+		local options
+		if type(settings.Options) == "table" then
+			options = {}
+			for _, option in ipairs(settings.Options) do table.insert(options, tostring(option)) end
+		end
+		return {
+			Title = settings.Title or settings.Name or settings.Text,
+			Minimum = tonumber(settings.Minimum),
+			Maximum = tonumber(settings.Maximum),
+			Step = tonumber(settings.Step) or tonumber(settings.Precision and 10 ^ -settings.Precision),
+			Options = options,
+			Multi = settings.Multi == true or nil,
+		}
+	end
+
+	function ControlRegistry:_Register(flag, kind, control, defaultValue, apply, owner, section, settings)
 		assert(type(flag) == "string" and flag ~= "", "stateful controls require a unique flag")
 		assert(self.Entries[flag] == nil, "duplicate control flag: " .. flag)
 		self.Entries[flag] = {
@@ -96,7 +113,11 @@ return function(Import)
 			Control = control,
 			Default = Util.Clone(defaultValue),
 			Apply = apply,
+			Meta = describe(settings),
+			Order = (self.Count or 0) + 1,
 		}
+		self.Count = (self.Count or 0) + 1
+		if self.Schema and section then self.Schema:AddControl(section, flag) end
 		if owner and self.OwnerActive[owner] == nil then self.OwnerActive[owner] = true end
 		self.Values[flag] = Util.Clone(defaultValue)
 		return control
@@ -113,7 +134,7 @@ return function(Import)
 		local control = section:Toggle(copied, flag)
 		return self:_Register(flag, "Toggle", control, copied.Default == true, function(value)
 			control:UpdateState(value == true)
-		end, owner)
+		end, owner, section, copied)
 	end
 
 	function ControlRegistry:Slider(section, settings, flag, owner)
@@ -147,7 +168,7 @@ return function(Import)
 			control:UpdateValue(number)
 			self.Values[flag] = number
 			Util.SafeCall(flag .. " applied", original, number)
-		end, owner)
+		end, owner, section, copied)
 	end
 
 	function ControlRegistry:Input(section, settings, flag, owner)
@@ -171,7 +192,7 @@ return function(Import)
 		local default = tostring(copied.Default or "")
 		return self:_Register(flag, "Input", control, default, function(value)
 			control:UpdateText(tostring(value or ""))
-		end, owner)
+		end, owner, section, copied)
 	end
 
 	function ControlRegistry:Dropdown(section, settings, flag, owner)
@@ -227,7 +248,7 @@ return function(Import)
 				for _, item in ipairs(resolved) do callbackValue[item] = true end
 			end
 			Util.SafeCall(flag .. " applied", original, Util.Clone(callbackValue))
-		end, owner)
+		end, owner, section, copied)
 	end
 
 	function ControlRegistry:Keybind(section, settings, flag, owner)
@@ -250,7 +271,7 @@ return function(Import)
 			control:Bind(bind)
 			self.Values[flag] = bind.Name
 			Util.SafeCall(flag .. " applied", rebound, bind)
-		end, owner)
+		end, owner, section, copied)
 	end
 
 	function ControlRegistry:Colorpicker(section, settings, flag, owner)
@@ -269,7 +290,7 @@ return function(Import)
 			if type(value) ~= "table" then return end
 			control:SetColor(Color3.new(tonumber(value.R) or 1, tonumber(value.G) or 1, tonumber(value.B) or 1))
 			if value.A ~= nil then control:SetAlpha(tonumber(value.A) or 0) end
-		end, owner)
+		end, owner, section, copied)
 	end
 
 	function ControlRegistry:Snapshot()
@@ -389,6 +410,28 @@ return function(Import)
 		local ok, err = self:_ApplyEntries(self.Values, owner)
 		self:EndApply()
 		return ok, err
+	end
+
+	function ControlRegistry:SetFromRemote(flag, value)
+		local entry = self.Entries[flag]
+		if not entry then return false, "unknown control" end
+		if not self:_CanDispatch(entry.Owner) then return false, "control is not active" end
+		local restoreIdentity = Util.ElevateIdentity()
+		local ok, err = xpcall(function() entry.Apply(Util.Clone(value)) end, Util.Traceback)
+		restoreIdentity()
+		if not ok then return false, err end
+		if entry.Kind == "Toggle" then
+			self.Values[flag] = value == true
+		elseif entry.Kind == "Input" then
+			self.Values[flag] = tostring(value or "")
+		elseif entry.Kind == "Colorpicker" and type(value) == "table" then
+			self.Values[flag] = Util.Clone(value)
+		end
+		local applied = Util.Clone(self.Values[flag])
+		if self.OnChanged then
+			Util.SafeCall("control changed " .. flag, self.OnChanged, flag, Util.Clone(applied), entry.Owner)
+		end
+		return true, applied
 	end
 
 	function ControlRegistry:Get(flag)

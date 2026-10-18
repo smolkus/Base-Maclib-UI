@@ -1,5 +1,8 @@
 # Base Maclib UI
 
+Works together with Jexvral Account Manager V2: see GUIDE.md, "Jexvral Hub",
+and `docs/HUB.md` in that repo.
+
 A game-agnostic executor hub template built on MacLib, with the proven
 module system from the Anime Expeditions project. Copy this folder as the
 starting point for new game scripts; write only game modules, keep the
@@ -25,6 +28,9 @@ src/Core/             Game-agnostic infrastructure (do not modify per game):
   UIManager.lua       Device class, base window size, responsive helpers.
   MacLibProvider.lua  Fetches/loads the MacLib UI library.
   SessionManager.lua  Auto Execute (queue_on_teleport) + Auto Reconnect.
+  CloudSync.lua       Jexvral Hub config sync (loader key, device wins).
+  HubLive.lua         Jexvral Hub live socket: UI, values, remote changes.
+  UiSchema.lua        Records each control's tab, sub tab and section.
 src/Modules/          Per-game feature modules (this is what you write):
   Misc.lua            Session tab: Auto Execute, Auto Reconnect.
   MobileButton.lua    Draggable PC/mobile toggle button (reclaims stale

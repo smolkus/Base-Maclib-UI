@@ -11,8 +11,12 @@ module contract.
 Execute the loader once (per game, see section 3 for the URL):
 
 ```lua
+getgenv().key = "jxk_..."
 loadstring(game:HttpGet("https://jexvral.xyz/game/base/loader"))()
 ```
+
+The key line is optional: with your Jexvral loader key (Jexvral Account Manager, Hub > Loader
+key) the hub syncs your configs and shows up live on the website. See "Jexvral Hub" below.
 
 What you get on first run:
 
@@ -160,3 +164,31 @@ API container or nginx needs attention.
 Server-side hard limits already in place: 5 MB max source file, 10s upstream
 timeout, 16 concurrent fetches, clean 404/413/503/504 error text (the loader
 rejects HTML/error documents and falls back to its GitHub repository).
+
+
+---
+
+## Jexvral Hub (works together with Jexvral Account Manager V2)
+
+This hub is the in-game half of the Hub in Jexvral Account Manager V2
+(`projects/Jexvral-Account-Manager V2`). The contract both sides follow is
+`docs/HUB.md` in that repo: read it before changing `CloudSync`, `HubLive`,
+`UiSchema` or how `ControlRegistry` records controls, and change both sides
+together.
+
+- `src/Core/CloudSync.lua` reads `getgenv().key` (`jxk_...`), says hello to
+  `https://jexvral.xyz/v1/hub/loader/hello` with every local config, applies
+  configs the member sent from the website ("Sync to device"), and pushes
+  every save. The copy on the device always wins.
+- `src/Core/HubLive.lua` keeps a WebSocket to `wss://jexvral.xyz/v1/hub/live`:
+  it sends the UI layout and current values, applies changes from the
+  website through `ControlRegistry:SetFromRemote`, loads configs, and
+  reports every change made in game.
+- `src/Core/UiSchema.lua` records which tab, sub tab and section each control
+  lives in, so the website can draw the same UI.
+- The default config `main` always exists and cannot be deleted.
+- The server finds the game from the place id, so this base also runs the
+  test game Bee Swarm Simulator (1537690962). Games are added on the server
+  (`hub_games`), not in this repo.
+- Copy these Core files to every game repo (for example Anime-Expedition) so
+  all games speak the same protocol.

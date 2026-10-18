@@ -213,12 +213,13 @@ return function(Import)
 		local loaded = self.FileSystem:ReadJson(self.AccountPath, self:_DefaultAccount())
 		self.Account = self:_MigrateAccount(loaded)
 
-		local names = self:List()
-		if #names == 0 then
+		local previous = self.Account.SelectedConfig
+		if not self:Exists("main") then
 			local ok, err = self:Create("main")
 			if not ok then return false, err end
-			names = self:List()
+			self.Account.SelectedConfig = previous
 		end
+		local names = self:List()
 		local selected = self:ResolveName(self.Account.SelectedConfig)
 		self.Account.SelectedConfig = selected or names[1] or "main"
 		return self:SaveAccount(true)
@@ -278,6 +279,7 @@ return function(Import)
 	function ConfigManager:Delete(name)
 		if #self:List() <= 1 then return false, "At least one config must exist. The last config cannot be deleted." end
 		name = self:ResolveName(name)
+		if name and string.lower(name) == "main" then return false, "The default config cannot be deleted." end
 		if not name then return false, "Selected config does not exist." end
 		local data, readError = self:_ReadConfig(name)
 		if not data then return false, "Cannot delete config: " .. tostring(readError) end

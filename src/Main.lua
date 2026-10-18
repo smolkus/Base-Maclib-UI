@@ -10,6 +10,7 @@ return function(Import)
 	local MacLibProvider = Import("MacLibProvider")
 	local SessionManager = Import("SessionManager")
 	local CloudSyncModule = Import("CloudSync")
+	local UiSchema = Import("UiSchema")
 	local PerformanceModule = Import("Performance")
 	local SettingsModule = Import("Settings")
 	local MiscModule = Import("Misc")
@@ -179,7 +180,8 @@ return function(Import)
 		end
 	end
 
-	local TabGroup = Window:TabGroup()
+	local Schema = UiSchema.new(Registry)
+	local TabGroup = Schema:TrackGroup(Window:TabGroup())
 	local Tabs = {
 		Misc = TabGroup:Tab({ Name = "Misc", Image = "rbxassetid://10734950309" }),
 		Settings = TabGroup:Tab({ Name = "Settings", Image = "rbxassetid://10734950020" }),
@@ -194,6 +196,7 @@ return function(Import)
 		MacLib = MacLib,
 		Tabs = Tabs,
 		Registry = Registry,
+		Schema = Schema,
 		Config = Config,
 		FileSystem = FileStore,
 		Player = LocalPlayer,
@@ -231,8 +234,9 @@ return function(Import)
 		Registry:Apply({})
 	end
 	if profileReady then Config:ActivateProfile() end
-	Registry.OnChanged = function()
+	Registry.OnChanged = function(flag, value)
 		Config:ScheduleAutoSave()
+		if Runtime.HubLive then Runtime.HubLive:Changed(flag, value) end
 	end
 	task.spawn(function()
 		Util.SafeCall("cloud sync", CloudSyncModule.Start, Context)
