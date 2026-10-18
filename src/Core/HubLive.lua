@@ -84,6 +84,13 @@ return function(Import)
 			self.Ready = true
 			self.Attempt = 0
 			self:Hello()
+			if not self.Announced then
+				self.Announced = true
+				ctx.Runtime:Notify("Hub", "Live control is on. Open the Hub on jexvral.xyz.")
+			end
+		elseif message.op == "error" then
+			ctx.Runtime:Notify("Hub", "Live control refused: " .. tostring(message.reason))
+			self.Refused = true
 		elseif message.op == "ping" then
 			self:_Send({op = "pong"})
 		elseif message.op == "set" then
@@ -130,7 +137,7 @@ return function(Import)
 			while not self.Stopped and self.Ctx.Runtime.Alive do
 				local connected = self:_Connect()
 				if connected == false and not connector() then return end
-				if self.Stopped or not self.Ctx.Runtime.Alive then return end
+				if self.Stopped or self.Refused or not self.Ctx.Runtime.Alive then return end
 				self.Attempt = math.min(self.Attempt + 1, #BACKOFF)
 				task.wait(BACKOFF[self.Attempt])
 			end
