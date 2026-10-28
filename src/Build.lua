@@ -1,7 +1,7 @@
 return function()
 	return {
 		Name = "Base Hub",
-		Version = "1.1.0",
+		Version = "1.2.0",
 		Repository = "https://github.com/Byorl/Base-Maclib-UI",
 		RawBase = "https://jexvral.xyz/game/base/",
 		LoaderUrl = "https://jexvral.xyz/game/base/loader",

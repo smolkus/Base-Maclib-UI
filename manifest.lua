@@ -1,5 +1,5 @@
 return {
-	Version = "1.1.0",
+	Version = "1.2.0",
 	Entry = "Main",
 	Modules = {
 		Build = "src/Build.lua",
@@ -13,6 +13,7 @@ return {
 		MacLibProvider = "src/Core/MacLibProvider.lua",
 		SessionManager = "src/Core/SessionManager.lua",
 		UiSchema = "src/Core/UiSchema.lua",
+		HubReadouts = "src/Core/HubReadouts.lua",
 		HubLive = "src/Core/HubLive.lua",
 		CloudSync = "src/Core/CloudSync.lua",
 		Performance = "src/Modules/Performance.lua",

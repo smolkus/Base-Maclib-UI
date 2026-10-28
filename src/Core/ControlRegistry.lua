@@ -41,6 +41,7 @@ return function(Import)
 	function ControlRegistry.new()
 		return setmetatable({
 			Entries = {},
+			Actions = {},
 			Values = {},
 			OwnerActive = {},
 			OwnerVersions = {},
@@ -61,6 +62,7 @@ return function(Import)
 		function scope:Dropdown(section, settings, flag) return root:Dropdown(section, settings, flag, owner) end
 		function scope:Keybind(section, settings, flag) return root:Keybind(section, settings, flag, owner) end
 		function scope:Colorpicker(section, settings, flag) return root:Colorpicker(section, settings, flag, owner) end
+		function scope:Action(section, settings, flag) return root:Action(section, settings, flag, owner) end
 		function scope:Get(flag) return root:Get(flag) end
 		function scope:Snapshot() return root:SnapshotOwner(owner) end
 		return scope
@@ -291,6 +293,31 @@ return function(Import)
 			control:SetColor(Color3.new(tonumber(value.R) or 1, tonumber(value.G) or 1, tonumber(value.B) or 1))
 			if value.A ~= nil then control:SetAlpha(tonumber(value.A) or 0) end
 		end, owner, section, copied)
+	end
+
+	function ControlRegistry:Action(section, settings, flag, owner)
+		assert(type(flag) == "string" and flag ~= "", "actions require a unique flag")
+		assert(self.Entries[flag] == nil and self.Actions[flag] == nil, "duplicate control flag: " .. flag)
+		local original = settings.Callback
+		local copied = Util.Clone(settings)
+		copied.Callback = function()
+			if not self:_CanDispatch(owner) then return end
+			Util.SafeCall(flag .. " action", original)
+		end
+		local control = section:Button(copied)
+		self.Actions[flag] = {Flag = flag, Kind = "Button", Owner = owner, Run = original, Meta = describe(copied)}
+		if self.Schema and section then self.Schema:AddControl(section, flag) end
+		return control
+	end
+
+	function ControlRegistry:RunAction(flag)
+		local action = self.Actions[flag]
+		if not action or type(action.Run) ~= "function" then return false, "unknown action" end
+		if not self:_CanDispatch(action.Owner) then return false, "action is not active" end
+		local restoreIdentity = Util.ElevateIdentity()
+		local ok, err = xpcall(action.Run, Util.Traceback)
+		restoreIdentity()
+		return ok, err
 	end
 
 	function ControlRegistry:Snapshot()

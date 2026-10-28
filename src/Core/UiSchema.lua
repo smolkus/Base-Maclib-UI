@@ -98,7 +98,7 @@ return function(Import)
 		for _, section in ipairs(list) do
 			local controls = {}
 			for _, flag in ipairs(section.Flags) do
-				local entry = self.Registry.Entries[flag]
+				local entry = self.Registry.Entries[flag] or self.Registry.Actions[flag]
 				if entry then table.insert(controls, control(entry)) end
 			end
 			if #controls > 0 then

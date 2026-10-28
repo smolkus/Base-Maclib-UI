@@ -5,8 +5,6 @@ return function(Import)
 	local Players = game:GetService("Players")
 	local CloudSync = {}
 
-	local DEFAULT_CONFIG = "main"
-
 	local function environment()
 		return (getgenv and getgenv()) or _G
 	end
@@ -48,69 +46,25 @@ return function(Import)
 		return true, decoded
 	end
 
-	local function readAll(ctx)
-		local configs = {}
-		for _, name in ipairs(ctx.Config:List()) do
-			local data = ctx.Config:_ReadConfig(name)
-			if type(data) == "table" then configs[name] = data end
-		end
-		return configs
-	end
-
-	function CloudSync.ApplyConfig(ctx, name, data)
-		if type(data) ~= "table" then return false end
-		local clean = ctx.Config:SanitizeName(name)
-		if clean == "" then return false end
-		local ok = ctx.FileSystem:WriteJson(ctx.Config:_ConfigPath(clean), data)
-		if not ok then return false end
-		ctx.Config.KnownRevisions[string.lower(clean)] = data.Revision
-		if string.lower(ctx.Config.Account.SelectedConfig) == string.lower(clean) then
-			return ctx.Config:Load(clean) ~= false
-		end
-		return true
-	end
-
-	function CloudSync.Push(ctx, name)
-		if not ctx.Runtime.CloudLinked then return false end
-		local data = ctx.Config:_ReadConfig(name)
-		if type(data) ~= "table" then return false end
-		return callApi(ctx, "PUT", "/v1/hub/loader/configs/" .. HttpService:UrlEncode(name), {
-			placeId = tostring(game.PlaceId),
-			data = data,
-			isDefault = string.lower(name) == DEFAULT_CONFIG,
-		})
-	end
-
-	function CloudSync.Remove(ctx, name)
-		if not ctx.Runtime.CloudLinked then return false end
-		return callApi(ctx, "DELETE", "/v1/hub/loader/configs/" .. HttpService:UrlEncode(name)
-			.. "?placeId=" .. tostring(game.PlaceId))
-	end
-
 	function CloudSync.Run(ctx)
 		local ok, result = callApi(ctx, "POST", "/v1/hub/loader/hello", {
 			placeId = tostring(game.PlaceId),
 			jobId = tostring(game.JobId),
 			user = {id = tostring(Players.LocalPlayer.UserId), name = Players.LocalPlayer.Name},
-			selected = ctx.Config.Account.SelectedConfig,
-			configs = readAll(ctx),
+			values = HubLive.Plain(ctx.Registry:Snapshot()),
 		})
 		if not ok then
 			ctx.Runtime:Notify("Hub", "Sync failed: " .. tostring(result))
 			return
 		end
 		ctx.Runtime.CloudLinked = true
-		local applied = 0
-		for _, item in ipairs(type(result.pending) == "table" and result.pending or {}) do
-			if CloudSync.ApplyConfig(ctx, tostring(item.name), item.data) then
-				applied = applied + 1
-				CloudSync.Push(ctx, tostring(item.name))
-			end
-		end
-		ctx.Runtime:Notify("Hub", applied > 0
-			and string.format("Synced. %d config(s) came from the website.", applied)
-			or "Synced with the Jexvral Hub.")
-		local live = HubLive.new(ctx, ctx.Runtime.Cloud.Key, CloudSync)
+		local role = type(result.role) == "table" and result.role or {}
+		local applied = HubLive.ApplyDesired(ctx, result.values, result.deviceOnly)
+		ctx.Runtime.HubRole = {Name = role.name, Version = role.version}
+		ctx.Runtime:Notify("Hub", applied
+			and string.format("Role %s, version %s.", tostring(role.name), tostring(role.version))
+			or "Some settings of the role could not be applied.")
+		local live = HubLive.new(ctx, ctx.Runtime.Cloud.Key)
 		ctx.Runtime.HubLive = live
 		ctx.Runtime.Janitor:Add(function() live:Stop() end)
 		live:Start()
@@ -121,39 +75,19 @@ return function(Import)
 		if not key then return end
 		local request = executorRequest()
 		if not request then
-			ctx.Runtime:Notify("Hub", "This executor has no HTTP request function; Hub sync is off.")
+			ctx.Runtime:Notify("Hub", "This executor has no HTTP request function; the Hub is off.")
 			return
 		end
 		ctx.Runtime.Cloud = {Key = key, Request = request}
+		ctx.Runtime.Readouts = ctx.Runtime.Readouts or {}
 
 		local config = ctx.Config
-		local baseSave = config.Save
-		function config:Save(name, ignoreRevision)
-			local results = table.pack(baseSave(self, name, ignoreRevision))
-			if results[1] then
-				local saved = self:ResolveName(name or self.Account.SelectedConfig)
-				task.spawn(function() Util.SafeCall("hub push", CloudSync.Push, ctx, saved) end)
-			end
-			return table.unpack(results, 1, results.n)
-		end
-		local baseDelete = config.Delete
-		function config:Delete(name)
-			local resolved = self:ResolveName(name)
-			local results = table.pack(baseDelete(self, name))
-			if results[1] and resolved then
-				task.spawn(function() Util.SafeCall("hub remove", CloudSync.Remove, ctx, resolved) end)
-			end
-			return table.unpack(results, 1, results.n)
-		end
 		local baseLoad = config.Load
 		function config:Load(name)
 			local results = table.pack(baseLoad(self, name))
 			local live = ctx.Runtime.HubLive
 			if results[1] and live then
-				task.spawn(function()
-					live:_Send({op = "selected", name = self.Account.SelectedConfig})
-					live:Hello()
-				end)
+				task.spawn(function() Util.SafeCall("hub loaded", live.Loaded, live, self.Account.SelectedConfig) end)
 			end
 			return table.unpack(results, 1, results.n)
 		end

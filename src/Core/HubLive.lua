@@ -1,11 +1,13 @@
 return function(Import)
 	local Util = Import("Util")
+	local HubReadouts = Import("HubReadouts")
 	local HttpService = game:GetService("HttpService")
 	local Players = game:GetService("Players")
 	local HubLive = {}
 	HubLive.__index = HubLive
 
 	local BACKOFF = {1, 2, 5, 10, 30}
+	local STATUS_EVERY = 10
 
 	local function connector()
 		local env = (getgenv and getgenv()) or _G
@@ -33,16 +35,46 @@ return function(Import)
 		for key, child in pairs(value) do output[key] = plain(child, depth + 1) end
 		return output
 	end
+	HubLive.Plain = plain
 
-	function HubLive.new(ctx, key, cloud)
+	local function same(left, right)
+		local ok, equal = pcall(function()
+			return HttpService:JSONEncode(plain(left)) == HttpService:JSONEncode(plain(right))
+		end)
+		return ok and equal
+	end
+
+	function HubLive.ApplyDesired(ctx, values, deviceOnly)
+		local registry = ctx.Registry
+		local skip = {}
+		for _, flag in ipairs(type(deviceOnly) == "table" and deviceOnly or {}) do skip[tostring(flag)] = true end
+		local adjusted, failed, changed = {}, 0, 0
+		registry.RemoteDepth = (registry.RemoteDepth or 0) + 1
+		for flag, value in pairs(type(values) == "table" and values or {}) do
+			if registry.Entries[flag] and not skip[flag] and not same(registry.Values[flag], value) then
+				local ok, applied = registry:SetFromRemote(flag, value)
+				if not ok then
+					failed = failed + 1
+				else
+					changed = changed + 1
+					if not same(applied, value) then adjusted[flag] = plain(applied) end
+				end
+			end
+		end
+		registry.RemoteDepth = registry.RemoteDepth - 1
+		if changed > 0 then ctx.Config:ScheduleAutoSave() end
+		return failed == 0, adjusted, changed
+	end
+
+	function HubLive.new(ctx, key)
 		return setmetatable({
 			Ctx = ctx,
 			Key = key,
-			Cloud = cloud,
 			Socket = nil,
 			Ready = false,
 			Stopped = false,
 			Attempt = 0,
+			LastStatus = nil,
 		}, HubLive)
 	end
 
@@ -59,23 +91,39 @@ return function(Import)
 	function HubLive:Hello()
 		if not self.Ready then return end
 		local ctx = self.Ctx
+		self.LastStatus = nil
 		self:_Send({
 			op = "hello",
 			placeId = tostring(game.PlaceId),
 			jobId = tostring(game.JobId),
 			user = self:_User(),
-			selected = ctx.Config.Account.SelectedConfig,
 			schema = ctx.Schema:Build(game.PlaceId),
 			values = plain(ctx.Registry:Snapshot()),
 		})
+		self:Status()
 	end
 
 	function HubLive:Changed(flag, value)
+		if (self.Ctx.Registry.RemoteDepth or 0) > 0 then return end
 		if self.Ready then self:_Send({op = "changed", flag = flag, value = plain(value)}) end
 	end
 
+	function HubLive:Loaded(name)
+		if not self.Ready then return end
+		self:_Send({op = "loaded", name = tostring(name), values = plain(self.Ctx.Registry:Snapshot())})
+	end
+
+	function HubLive:Status()
+		if not self.Ready then return end
+		local readouts = HubReadouts.Collect(self.Ctx.Runtime)
+		local encoded = HttpService:JSONEncode(readouts)
+		if encoded == self.LastStatus then return end
+		self.LastStatus = encoded
+		self:_Send({op = "status", readouts = readouts})
+	end
+
 	function HubLive:_Ack(id, ok, value)
-		self:_Send({op = "ack", id = id, ok = ok == true, value = plain(value)})
+		self:_Send({op = "ack", id = id, ok = ok == true, value = value})
 	end
 
 	function HubLive:_Handle(message)
@@ -86,23 +134,22 @@ return function(Import)
 			self:Hello()
 			if not self.Announced then
 				self.Announced = true
-				ctx.Runtime:Notify("Hub", "Live control is on. Open the Hub on jexvral.xyz.")
+				ctx.Runtime:Notify("Hub", "Live on jexvral.xyz.")
 			end
 		elseif message.op == "error" then
 			ctx.Runtime:Notify("Hub", "Live control refused: " .. tostring(message.reason))
 			self.Refused = true
 		elseif message.op == "ping" then
 			self:_Send({op = "pong"})
-		elseif message.op == "set" then
-			local ok, applied = ctx.Registry:SetFromRemote(tostring(message.flag), message.value)
-			self:_Ack(message.id, ok, ok and applied or nil)
-		elseif message.op == "load" then
-			local ok = ctx.Config:Load(tostring(message.name))
-			self:_Ack(message.id, ok)
 		elseif message.op == "apply" then
-			local ok = self.Cloud.ApplyConfig(ctx, tostring(message.name), message.data)
+			local ok, adjusted, changed = HubLive.ApplyDesired(ctx, message.values, message.deviceOnly)
+			self:_Ack(message.id, ok, adjusted)
+			if changed > 0 then
+				ctx.Runtime.HubRole = {Name = message.role, Version = message.version}
+			end
+		elseif message.op == "run" then
+			local ok = ctx.Registry:RunAction(tostring(message.action))
 			self:_Ack(message.id, ok)
-			if ok then self:Hello() end
 		end
 	end
 
@@ -140,6 +187,12 @@ return function(Import)
 				if self.Stopped or self.Refused or not self.Ctx.Runtime.Alive then return end
 				self.Attempt = math.min(self.Attempt + 1, #BACKOFF)
 				task.wait(BACKOFF[self.Attempt])
+			end
+		end)
+		task.spawn(function()
+			while not self.Stopped and self.Ctx.Runtime.Alive do
+				task.wait(STATUS_EVERY)
+				Util.SafeCall("hub status", self.Status, self)
 			end
 		end)
 	end

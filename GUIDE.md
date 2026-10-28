@@ -16,7 +16,8 @@ loadstring(game:HttpGet("https://jexvral.xyz/game/base/loader"))()
 ```
 
 The key line is optional: with your Jexvral loader key (Jexvral Account Manager, Hub > Loader
-key) the hub syncs your configs and shows up live on the website. See "Jexvral Hub" below.
+key) the hub runs the role you gave this account and shows up live on the website. See
+"Jexvral Hub" below.
 
 What you get on first run:
 
@@ -176,17 +177,33 @@ This hub is the in-game half of the Hub in Jexvral Account Manager V2
 `UiSchema` or how `ControlRegistry` records controls, and change both sides
 together.
 
-- `src/Core/CloudSync.lua` reads `getgenv().key` (`jxk_...`), says hello to
-  `https://jexvral.xyz/v1/hub/loader/hello` with every local config, applies
-  configs the member sent from the website ("Sync to device"), and pushes
-  every save. The copy on the device always wins.
+The Hub works with roles: a role is a named set of settings for a game, and
+every Roblox account that runs the hub has one (Main until the member picks
+another on the website). The website edits a role once and rolls it out to
+every running client of that role.
+
+- `src/Core/CloudSync.lua` reads `getgenv().key` (`jxk_...`) and says hello to
+  `https://jexvral.xyz/v1/hub/loader/hello` with the current values. The answer
+  is what this account should run (its role, its own values and anything still
+  changed in game); it is applied before the live socket opens. The first
+  hello of a game makes the Main role from these values. Local configs stay on
+  the device; loading one in game is reported, and what differs from the role
+  shows on the website as changed in game.
 - `src/Core/HubLive.lua` keeps a WebSocket to `wss://jexvral.xyz/v1/hub/live`:
-  it sends the UI layout and current values, applies changes from the
-  website through `ControlRegistry:SetFromRemote`, loads configs, and
-  reports every change made in game.
+  it sends the UI layout and values, applies rollouts (`apply`, only the values
+  that differ, answering with any it had to adjust), presses buttons (`run`),
+  reports changes the player makes in game (not changes from the website) and
+  sends readouts every 10 seconds when they change.
+- `src/Core/HubReadouts.lua` collects readouts: every `leaderstats` value
+  (numbers count as progress, so a client whose numbers stop moving shows as
+  stalled), FPS, and anything a module adds:
+  `table.insert(ctx.Runtime.Readouts, function() return {name = "Wave", value = n, progress = true} end)`.
+- `ControlRegistry:Action(section, settings, flag)` creates a MacLib button the
+  website can press on one or many clients (Misc has "Rejoin Server").
 - `src/Core/UiSchema.lua` records which tab, sub tab and section each control
   lives in, so the website can draw the same UI.
-- The default config `main` always exists and cannot be deleted.
+- Flags a role keeps per device (webhook URLs always) are never sent or
+  overwritten.
 - The server finds the game from the place id, so this base also runs the
   test game Bee Swarm Simulator (1537690962). Games are added on the server
   (`hub_games`), not in this repo.

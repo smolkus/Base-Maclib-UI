@@ -28,8 +28,9 @@ src/Core/             Game-agnostic infrastructure (do not modify per game):
   UIManager.lua       Device class, base window size, responsive helpers.
   MacLibProvider.lua  Fetches/loads the MacLib UI library.
   SessionManager.lua  Auto Execute (queue_on_teleport) + Auto Reconnect.
-  CloudSync.lua       Jexvral Hub config sync (loader key, device wins).
-  HubLive.lua         Jexvral Hub live socket: UI, values, remote changes.
+  CloudSync.lua       Jexvral Hub hello: loader key, applies this account's role.
+  HubLive.lua         Jexvral Hub live socket: UI, values, rollouts, buttons.
+  HubReadouts.lua     Jexvral Hub readouts (leaderstats, FPS, module values).
   UiSchema.lua        Records each control's tab, sub tab and section.
 src/Modules/          Per-game feature modules (this is what you write):
   Misc.lua            Session tab: Auto Execute, Auto Reconnect.

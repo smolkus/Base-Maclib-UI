@@ -1,4 +1,6 @@
 return function(Import)
+	local Players = game:GetService("Players")
+	local TeleportService = game:GetService("TeleportService")
 	local Misc = {}
 
 	return {
@@ -28,6 +30,12 @@ return function(Import)
 					ctx.Config.AccountDirty = true
 				end,
 			}, "misc.auto_reconnect")
+			ctx.Registry:Action(session, {
+				Name = "Rejoin Server",
+				Callback = function()
+					TeleportService:TeleportToPlaceInstance(game.PlaceId, game.JobId, Players.LocalPlayer)
+				end,
+			}, "misc.rejoin")
 			session:Label({ Text = "Auto Execute relaunches the hub after teleports and rejoins. Auto Reconnect recovers dropped sessions with backoff." })
 			return state
 		end,
