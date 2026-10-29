@@ -37,39 +37,11 @@ return function(Import)
 	end
 	HubLive.Plain = plain
 
-	local function same(left, right)
-		local ok, equal = pcall(function()
-			return HttpService:JSONEncode(plain(left)) == HttpService:JSONEncode(plain(right))
-		end)
-		return ok and equal
-	end
-
-	function HubLive.ApplyDesired(ctx, values, deviceOnly)
-		local registry = ctx.Registry
-		local skip = {}
-		for _, flag in ipairs(type(deviceOnly) == "table" and deviceOnly or {}) do skip[tostring(flag)] = true end
-		local adjusted, failed, changed = {}, 0, 0
-		registry.RemoteDepth = (registry.RemoteDepth or 0) + 1
-		for flag, value in pairs(type(values) == "table" and values or {}) do
-			if registry.Entries[flag] and not skip[flag] and not same(registry.Values[flag], value) then
-				local ok, applied = registry:SetFromRemote(flag, value)
-				if not ok then
-					failed = failed + 1
-				else
-					changed = changed + 1
-					if not same(applied, value) then adjusted[flag] = plain(applied) end
-				end
-			end
-		end
-		registry.RemoteDepth = registry.RemoteDepth - 1
-		if changed > 0 then ctx.Config:ScheduleAutoSave() end
-		return failed == 0, adjusted, changed
-	end
-
-	function HubLive.new(ctx, key)
+	function HubLive.new(ctx, key, cloud)
 		return setmetatable({
 			Ctx = ctx,
 			Key = key,
+			Cloud = cloud,
 			Socket = nil,
 			Ready = false,
 			Stopped = false,
@@ -104,13 +76,7 @@ return function(Import)
 	end
 
 	function HubLive:Changed(flag, value)
-		if (self.Ctx.Registry.RemoteDepth or 0) > 0 then return end
 		if self.Ready then self:_Send({op = "changed", flag = flag, value = plain(value)}) end
-	end
-
-	function HubLive:Loaded(name)
-		if not self.Ready then return end
-		self:_Send({op = "loaded", name = tostring(name), values = plain(self.Ctx.Registry:Snapshot())})
 	end
 
 	function HubLive:Status()
@@ -141,12 +107,12 @@ return function(Import)
 			self.Refused = true
 		elseif message.op == "ping" then
 			self:_Send({op = "pong"})
-		elseif message.op == "apply" then
-			local ok, adjusted, changed = HubLive.ApplyDesired(ctx, message.values, message.deviceOnly)
-			self:_Ack(message.id, ok, adjusted)
-			if changed > 0 then
-				ctx.Runtime.HubRole = {Name = message.role, Version = message.version}
-			end
+		elseif message.op == "config" then
+			self.Cloud.Received(ctx, message)
+		elseif message.op == "remove" then
+			self.Cloud.Removed(ctx, tostring(message.name))
+		elseif message.op == "select" then
+			self:_Ack(message.id, self.Cloud.Select(ctx, tostring(message.name)))
 		elseif message.op == "run" then
 			local ok = ctx.Registry:RunAction(tostring(message.action))
 			self:_Ack(message.id, ok)

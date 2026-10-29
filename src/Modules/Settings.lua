@@ -80,6 +80,7 @@ return function()
 					configDropdown:UpdateSelection(wanted)
 				end
 			end
+			ctx.Runtime.RefreshConfigs = refresh
 
 			createConfig:Button({
 				Name = "Create",
